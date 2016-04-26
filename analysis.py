@@ -6,9 +6,7 @@ from numpy import cumsum
 import os
 import csv
 from itertools import izip
-import re
 from collections import Counter
-import heapq
 import math
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.patches as mpatches
@@ -96,91 +94,3 @@ def getFileFirstName(fullName):
 	for i in range(1,len(fullName)):
 		if fullName[-1*i] == '.':
 			return fullName[0:-1*i]
-
-class TraceObject(object):
-# maintains trace info a dictionary keyed by their Job name. Make 1 object for 1 execution. This takes input file in format coflow-benchmark trace.
-	def __init__(self,inputFile):
-		self.baseAddress = os.getcwd()#'/home/ajajoo/Desktop/Research/coflow/coflowsim-master/results/'
-		self.data = {}
-		with open(self.baseAddress+'/'+inputFile,'r') as f:
-			lines = f.readline()
-			for line in f:	
-				line = line.replace(':',' ');
-				nos = line.split() 
-				jName = "JOB-"+str(nos[0])
-				self.data[jName] = {};
-				self.data[jName]["arrivalTime"] = float(nos[1])	
-				self.data[jName]["numMappers"] = float(nos[2])	
-				index = int(self.data[jName]["numMappers"]) + 3
-				self.data[jName]["mapperPortList"] = nos[3:index]	
-				self.data[jName]["numReducers"] = float(nos[index])
-				index +=1 
-				self.data[jName]["reducerPortList"] = nos[index:][0:][::2]
-				self.data[jName]["reducerTotalData"] = nos[index:][1:][::2]
-				for x in range(len(self.data[jName]["reducerTotalData"])):
-					self.data[jName]["reducerTotalData"][x] = float(self.data[jName]["reducerTotalData"][x])*1024*1024
-				self.data[jName]["length"] = max(self.data[jName]["reducerTotalData"])/len(self.data[jName]["mapperPortList"])
-				self.data[jName]["size"] = sum(self.data[jName]["reducerTotalData"])	
-	def __getitem__(self,key):
-		return self.data[key]
-	def getArrayByKey(self,key):
-		toReturn = {};
-		for x in self.data:
-			toReturn[x] = self.data[x][key];
-		return toReturn;
-
-class ResultObject(object):
-# maintains results in a dictionary keyed by their Job name. Make 1 object for 1 execution.
-	def __init__(self,inputFile):
-		self.baseAddress = os.getcwd()#'/home/ajajoo/Desktop/Research/coflow/coflowsim-master/results/'
-		self.data = {}
-		with open(self.baseAddress+'/'+inputFile,'r') as f:
-			lines = f.readlines()
-			self.totalCCT = float(lines[-1].split()[0])
-			for line in lines:
-				line = line.split()
-				if line[0][0:4] != "JOB-":
-					continue
-				else:
-					self.data[line[0]] = {};
-				self.data[line[0]]["simulatedstarttime"] = float(line[1]);	
-				self.data[line[0]]["simulatedfinishtime"] = float(line[2]);	
-				self.data[line[0]]["nummappers"] = float(line[3]);	
-				self.data[line[0]]["numreducers"] = float(line[4]);	
-				self.data[line[0]]["totalshufflebytes"] = float(line[5]);	
-				self.data[line[0]]["maxshufflebytes"] = float(line[6]);	
-				self.data[line[0]]["simulationDuration"] = float(line[7]);	
-				self.data[line[0]]["deadline"] = float(line[8]);	
-				self.data[line[0]]["simulatedshuffleindividualsums"] = float(line[9]);
-	def __getitem__(self,key):
-		return self.data[key]
-	def getData(self,editable=False):
-		if editable:
-			return self.data
-		else:
-			return self.data.copy()
-	def getArrayByKey(self,key):
-		toReturn = {}
-		for job in self.data.keys():
-			toReturn[job] = float(self.data[job][key])
-		return toReturn
-	def normalizeWithOtherResults(self, otherObject, comparisonKey):
-	# normalizes self relative to other
-		results = {}
-		otherData = otherObject.getData()
-		if len(self.data.keys())!=len(otherData.keys()):
-			return results
-		for key in self.data.keys():
-			results[key] = self.data[key][comparisonKey]/otherData[key][comparisonKey]
-		del otherData
-		return results
-	def getEndQueueForCoflow(self,coflowName):
-		qMin = 1024*1024*10
-		E = 10
-		q = math.log(self.data[coflowName]["totalshufflebytes"]/qMin,E)
-		return 0 if q <= 0 else int(q) + 1
-	def getEndQueueForAllCoflows(self):
-		toReturn = {}
-		for coflow in self.data:
-			toReturn[coflow] = self.getEndQueueForCoflow(coflow)
-		return toReturn
